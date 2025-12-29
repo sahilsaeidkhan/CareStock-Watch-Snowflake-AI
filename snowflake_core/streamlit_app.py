@@ -1310,14 +1310,23 @@ elif page == "Analytics":
     # -------------------------------------------------
     st.subheader("Days of stock cover — heatmap")
 
-    heat = (
-        df.pivot(
-            index="LOCATION",
-            columns="ITEM",
-            values="DAYS_OF_COVER"
+    # Use pivot_table with aggregation to handle duplicate LOCATION×ITEM pairs safely
+    try:
+        heat = (
+            df.pivot_table(
+                index="LOCATION",
+                columns="ITEM",
+                values="DAYS_OF_COVER",
+                aggfunc="mean"
+            )
+            .fillna(0)
         )
-        .fillna(0)
-    )
+    except Exception as e:
+        # Fallback: group & unstack then fill missing values
+        st.warning("Duplicate LOCATION×ITEM rows found — aggregating DAYS_OF_COVER using mean for the heatmap.")
+        heat = (
+            df.groupby(["LOCATION", "ITEM"])["DAYS_OF_COVER"].mean().unstack(fill_value=0)
+        )
 
     fig_heat = px.imshow(
         heat,
