@@ -253,6 +253,13 @@ if "location_map" in st.session_state and st.session_state.location_map:
 if "demo_df" in st.session_state and st.session_state.demo_df is not None:
     df = st.session_state.demo_df
 
+# Auto-seed a small targeted demo when running locally so key panels show content
+if session is None and "demo_df" not in st.session_state and "demo_auto_seeded" not in st.session_state:
+    # 50 rows with 20% at-risk and 15% life-saving by default
+    st.session_state.demo_df = generate_targeted_demo(50, pct_at_risk=0.2, pct_life_saving=0.15)
+    st.session_state.demo_auto_seeded = True
+    df = st.session_state.demo_df
+
 # =================================================
 # SESSION STATE (Settings persistence)
 # =================================================
@@ -625,7 +632,7 @@ if page == "Dashboard":
                     "DAYS_TO_STOCKOUT"
                 ]
             ],
-            use_container_width=True
+            width='stretch'
         )
 
     st.divider()
@@ -654,7 +661,7 @@ if page == "Dashboard":
                     "FORECAST_HIGH"
                 ]
             ],
-            use_container_width=True
+            width='stretch'
         )
 
         with st.expander("🧠 How the AI forecast works"):
@@ -848,7 +855,7 @@ elif page == "Actions":
     if st.session_state.action_log:
         st.dataframe(
             pd.DataFrame(st.session_state.action_log),
-            use_container_width=True
+            width='stretch'
         )
     else:
         st.info("No actions recorded yet.")
@@ -1164,7 +1171,7 @@ elif page == "Impact":
         ]
     })
 
-    st.dataframe(impact_table, use_container_width=True)
+    st.dataframe(impact_table, width='stretch')
 
     st.divider()
 
@@ -1238,7 +1245,7 @@ elif page == "Analytics":
         marker=dict(opacity=0.9)
     )
 
-    st.plotly_chart(fig_status, use_container_width=True)
+    st.plotly_chart(fig_status, width='stretch')
 
     st.caption(
         "This view helps leaders immediately assess how much inventory "
@@ -1289,7 +1296,7 @@ elif page == "Analytics":
             marker=dict(opacity=0.85)
         )
 
-        st.plotly_chart(fig_location, use_container_width=True)
+        st.plotly_chart(fig_location, width='stretch')
 
     st.caption(
         "This ranking helps prioritize interventions at locations "
@@ -1338,7 +1345,7 @@ elif page == "Analytics":
         )
     )
 
-    st.plotly_chart(fig_heat, use_container_width=True)
+    st.plotly_chart(fig_heat, width='stretch')
 
     st.caption(
         "Red zones indicate items likely to run out soon; "
@@ -1370,7 +1377,7 @@ elif page == "Analytics":
                     "DAYS_TO_STOCKOUT"
                 ]
             ],
-            use_container_width=True
+            width='stretch'
         )
 
         st.warning(
