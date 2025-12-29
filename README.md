@@ -108,6 +108,18 @@ All data, logic, and UI run **securely inside Snowflake**.
 
 ---
 
+🚀 Quick Start (Prototype)
+
+1. Clone the repository
+2. Install dependencies:
+   pip install -r Docs/requirements.txt
+3. Configure Snowflake credentials (see Docs/SETUP_GUIDE.md)
+4. Run the Streamlit app inside Snowflake
+
+**Note:** This is a prototype. Demo screenshots and sample outputs are provided for evaluation.
+
+---
+
 ## 👥 Intended Users
 
 - Hospital procurement teams  
@@ -140,10 +152,13 @@ This project was built as part of the **AI for Good Hackathon**, focusing on:
 
 ## 📎 Repository Structure
 
-- `MAIN_README.md` – Detailed explanation  
-- `PROJECT_DOCUMENTATION.md` – Design & logic  
-- `SETUP_GUIDE.md` – Environment setup  
-- `CODE_STRUCTURE.md` – Code organization  
+/Docs
+ ├── PROJECT_DOCUMENTATION.md – Detailed design & logic
+ ├── SETUP_GUIDE.md – Environment & execution steps
+ ├── CODE_STRUCTURE.md – Code organization & flow
+ └── requirements.txt – Python dependencies
+
+Files under `/Docs` contain project documentation and the Python dependency list — use them to understand design, setup, and code layout.
 
 ---
 
