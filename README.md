@@ -71,6 +71,9 @@ All data, logic, and UI run **securely inside Snowflake**.
 ## 🧱 Architecture (High Level)
 
 - **Data Sources:** Hospitals, NGOs, PDS daily stock records  
+
+“Daily stock data is ingested into Snowflake using Snowpipe / COPY INTO from hospital systems or spreadsheets, with optional API ingestion via external functions for supplier or NGO data.”
+
 - **Snowflake Tables:** Central inventory repository  
 - **Dynamic Tables & SQL Views:** Stock health computation  
 - **Snowflake Cortex (AI-ready):** Demand forecasting logic  

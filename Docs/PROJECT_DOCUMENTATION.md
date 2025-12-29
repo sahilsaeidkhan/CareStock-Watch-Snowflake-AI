@@ -140,6 +140,8 @@ CareStock Watch converts simple daily stock data into **early warnings, forecast
 - Simple daily stock table:
   `(date, location, item, opening_stock, received, issued, closing_stock, lead_time_days)`
 
+“Daily stock data is ingested into Snowflake using Snowpipe / COPY INTO from hospital systems or spreadsheets, with optional API ingestion via external functions for supplier or NGO data.”
+
 **Snowflake Platform**
 - Snowflake Tables – Central inventory repository
 - Dynamic Tables – Auto-refresh stock health metrics
