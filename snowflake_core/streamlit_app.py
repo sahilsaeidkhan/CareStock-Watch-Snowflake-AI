@@ -165,6 +165,42 @@ def load_stock_health():
 
 df = load_stock_health()
 
+# Demo data generator (for local testing)
+def generate_demo_data(n=100):
+    import random
+    locations = [
+        "Central Medical Store",
+        "District Hospital",
+        "Community Health Centre",
+        "Primary Health Post",
+        "Urban Clinic"
+    ]
+    items = ["Insulin", "Oxygen", "Paracetamol", "Bandage", "Antibiotic", "Ventilator", "Blood"]
+    rows = []
+    for _ in range(n):
+        loc = random.choice(locations)
+        item = random.choice(items)
+        closing_stock = max(0, int(np.random.poisson(80)))
+        avg_daily_demand = max(0.1, round(np.random.exponential(2.5), 2))
+        lead_time = random.randint(1, 30)
+        days_to_stockout = round(closing_stock / max(avg_daily_demand, 1), 1)
+        if days_to_stockout <= 5:
+            status = "Critical"
+        elif days_to_stockout <= 15:
+            status = "Warning"
+        else:
+            status = "Healthy"
+        rows.append({
+            "LOCATION": loc,
+            "ITEM": item,
+            "CLOSING_STOCK": closing_stock,
+            "AVG_DAILY_DEMAND": avg_daily_demand,
+            "DAYS_TO_STOCKOUT": days_to_stockout,
+            "STOCK_STATUS": status,
+            "LEAD_TIME_DAYS": lead_time
+        })
+    return pd.DataFrame(rows)
+
 # Apply user-provided location mapping so UI shows readable names
 if "location_map" in st.session_state and st.session_state.location_map:
     try:
@@ -174,6 +210,10 @@ if "location_map" in st.session_state and st.session_state.location_map:
     except Exception:
         # if mapping fails, continue with original LOCATION values
         pass
+
+# Use a generated demo dataset if the user requested it (keeps state across reruns)
+if "demo_df" in st.session_state and st.session_state.demo_df is not None:
+    df = st.session_state.demo_df
 
 # =================================================
 # SESSION STATE (Settings persistence)
@@ -232,19 +272,23 @@ page = st.selectbox(
 with st.container():
     fcol1, fcol2, fcol3 = st.columns([2, 2, 6])
 
+    # Safely determine available options (works with empty or missing columns)
+    loc_options = sorted(df["LOCATION"].dropna().unique()) if "LOCATION" in df.columns else []
+    item_options = sorted(df["ITEM"].dropna().unique()) if "ITEM" in df.columns else []
+
     with fcol1:
         sel_locations = st.multiselect(
             "📍 Location",
-            options=sorted(df["LOCATION"].unique()),
-            default=sorted(df["LOCATION"].unique()),
+            options=loc_options,
+            default=loc_options,
             key="filter_location"
         )
 
     with fcol2:
         sel_items = st.multiselect(
             "📦 Item",
-            options=sorted(df["ITEM"].unique()),
-            default=sorted(df["ITEM"].unique()),
+            options=item_options,
+            default=item_options,
             key="filter_item"
         )
 
@@ -378,6 +422,27 @@ if page == "Dashboard":
     )
 
     st.divider()
+
+    # -------------------------------------------------
+    # DATA STATUS PANEL (helps debug empty views)
+    # -------------------------------------------------
+    total_rows = len(df)
+    status_counts = df["STOCK_STATUS"].value_counts().to_dict() if "STOCK_STATUS" in df.columns else {}
+    life_saving_at_risk = len(df[(df.get("ITEM_PRIORITY") == "🔴 Life-saving") & (df.get("STOCK_STATUS").isin(["Critical","Warning"]))]) if "ITEM_PRIORITY" in df.columns and "STOCK_STATUS" in df.columns else 0
+
+    conn_label = "Snowflake" if session else "LOCAL demo"
+
+    st.info(
+        f"**Data status:** Connection: **{conn_label}** — Rows: **{total_rows}**  |  "
+        f"🔴 Critical: **{status_counts.get('Critical',0)}**  |  🟡 Warning: **{status_counts.get('Warning',0)}**  |  🟢 Healthy: **{status_counts.get('Healthy',0)}**"
+    )
+
+    if not session:
+        with st.expander("Demo data tools"):
+            size = st.selectbox("Demo dataset size", [10, 50, 100, 200], index=1)
+            if st.button("🔁 Generate larger demo dataset", key="gen_demo"):
+                st.session_state.demo_df = generate_demo_data(size)
+                st.experimental_rerun()
 
     # -------------------------------------------------
     # CORE KPIs (EXECUTIVE VIEW)
@@ -531,23 +596,11 @@ if page == "Dashboard":
     # -------------------------------------------------
     # QUICK ACTION EXPORT
     # -------------------------------------------------
-    # Ensure CSV is encoded in UTF-8 with BOM for Excel compatibility
-    # and pass bytes to Streamlit to avoid encoding issues with emojis.
-    if risk_df is None or risk_df.empty:
-        csv_bytes = "Location,Item,Item_Priority,Status_Badge,Closing_Stock,Days_To_Stockout\n".encode("utf-8-sig")
-    else:
-        try:
-            csv_bytes = risk_df.to_csv(index=False).encode("utf-8-sig")
-        except Exception:
-            # Fallback to returning a plain UTF-8 string if bytes conversion fails
-            csv_bytes = risk_df.to_csv(index=False)
-
     st.download_button(
-        label="⬇️ Download priority action list (CSV)",
-        data=csv_bytes,
+        "⬇️ Download priority action list (CSV)",
+        risk_df.to_csv(index=False),
         file_name="carestock_priority_actions.csv",
-        mime="text/csv; charset=utf-8",
-        key="download_priority_actions"
+        mime="text/csv"
     )
 
     st.divider()
