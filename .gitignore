@@ -1,28 +1,87 @@
+# =========================
 # Python
+# =========================
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
 *.so
 .Python
-env/
+.env
+.env.*
+.venv/
 venv/
 ENV/
+env/
 
-# IDE
+# =========================
+# Jupyter / Notebooks
+# =========================
+.ipynb_checkpoints/
+*.ipynb
+
+# =========================
+# Streamlit
+# =========================
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# =========================
+# Snowflake / Credentials
+# =========================
+snowflake_credentials.json
+snowflake_config.yaml
+*.key
+*.pem
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# IDE / Editor
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+*.iml
 
-# OS
-.DS_Store
-Thumbs.db
+# =========================
+# Testing / Coverage
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
 
-# Streamlit
-.streamlit/
+# =========================
+# Data Files (Optional)
+# =========================
+data/*.csv
+data/*.json
+data/*.parquet
 
-# Data
-.cache/
-*.csv
-*.xlsx
+# =========================
+# Temporary / Backup
+# =========================
+*.bak
+*.tmp
+*.old
