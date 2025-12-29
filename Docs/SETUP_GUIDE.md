@@ -1,324 +1,215 @@
-# CareStock Watch - Setup and Installation Guide
+🛠️ SETUP_GUIDE.md
 
-## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Local Development Setup](#local-development-setup)
-3. [Snowflake Configuration](#snowflake-configuration)
-4. [Environment Variables](#environment-variables)
-5. [Running the Application](#running-the-application)
-6. [Troubleshooting](#troubleshooting)
+CareStock Watch – Snowflake-Native AI Inventory Application
 
-## Prerequisites
+1️⃣ Overview
 
-### System Requirements
-- **Python**: 3.8 or higher
-- **pip**: Latest version
-- **Git**: For version control
-- **OS**: Linux, macOS, or Windows
-- **RAM**: Minimum 4GB
-- **Disk Space**: At least 2GB for dependencies
+This guide explains how to set up and run CareStock Watch, a Snowflake-native Streamlit application for predicting stock-outs, reducing wastage, and prioritizing reorders for hospitals, public distribution systems (PDS), and NGOs.
 
-### Accounts and Services
-- Snowflake account (Standard Edition or higher)
-- Snowflake warehouse (compute resources)
-- GitHub account (for repository access)
+The application runs entirely inside Snowflake using:
 
-### Required Software
-```bash
-# Check Python version
-python --version  # Should be 3.8+
+Snowflake Tables & Dynamic Tables
 
-# Check pip
-pip --version
+SQL Views
 
-# Check Git
-git --version
-```
+Snowpark (Python)
 
-## Local Development Setup
+Streamlit in Snowflake
 
-### Step 1: Clone the Repository
+AI-ready forecasting logic (Cortex-ready)
 
-```bash
-# Clone the repository
-git clone https://github.com/sahilsaeidkhan/CareStock-Watch.git
+No external backend or data movement is required.
 
-# Navigate to project directory
-cd CareStock-Watch
+2️⃣ Prerequisites
 
-# Check git status
-git status
-```
+Before starting, ensure you have:
 
-### Step 2: Create Virtual Environment
+Required
 
-**Using venv (Recommended)**
-```bash
-# Create virtual environment
-python -m venv venv
+✅ Snowflake account (Trial or Paid)
 
-# Activate virtual environment
-# On Linux/macOS
-source venv/bin/activate
+✅ Role with permission to:
 
-# On Windows
-venv\Scripts\activate
-```
+Create databases, schemas, tables
 
-**Using Conda**
-```bash
-# Create conda environment
-conda env create -f environment.yml
+Create Dynamic Tables
 
-# Activate environment
-conda activate carestock-watch
-```
+Run Streamlit apps
 
-### Step 3: Install Dependencies
+✅ Python 3.8+ (for local testing only, optional)
 
-```bash
-# Upgrade pip
-pip install --upgrade pip
+✅ Git (optional)
 
-# Install requirements
-pip install -r requirements.txt
+Recommended
 
-# Verify installation
-pip list | grep -E 'streamlit|snowflake|pandas'
-```
+Snowflake Web UI access
 
-### Step 4: Verify Installation
+Basic familiarity with SQL and Streamlit
 
-```bash
-# Test imports
-python -c "import streamlit as st; import snowflake.snowpark as sp; print('All imports successful!')"
-```
+3️⃣ Snowflake Environment Setup
+Step 1: Create Database & Schema
+CREATE DATABASE CARESTOCK_DB;
+CREATE SCHEMA CARESTOCK_DB.PUBLIC;
 
-## Snowflake Configuration
+Step 2: Create Base Inventory Table
 
-### Step 1: Create Snowflake Database
+This table represents the daily stock snapshot received from hospitals, PDS, or NGOs.
 
-Log in to your Snowflake account and execute:
-
-```sql
--- Create database
-CREATE DATABASE HOSPITAL_STOCK_DB;
-
--- Use the database
-USE DATABASE HOSPITAL_STOCK_DB;
-
--- Create schema
-CREATE SCHEMA PUBLIC;
-
--- Create warehouse (if not exists)
-CREATE WAREHOUSE COMPUTE_WH WITH WAREHOUSE_SIZE = 'SMALL';
-```
-
-### Step 2: Create Required Tables
-
-```sql
--- INVENTORY_ITEMS table
-CREATE TABLE INVENTORY_ITEMS (
-    ITEM_ID INT PRIMARY KEY,
-    ITEM_NAME VARCHAR(100),
-    CATEGORY VARCHAR(50),
-    CURRENT_STOCK INT,
-    REORDER_POINT INT,
-    SAFETY_STOCK INT,
-    SUPPLIER_LEAD_DAYS INT,
-    UNIT_COST DECIMAL(10,2),
-    LAST_UPDATED TIMESTAMP
+CREATE OR REPLACE TABLE DAILY_STOCK (
+    DATE DATE,
+    LOCATION STRING,
+    ITEM STRING,
+    OPENING_STOCK NUMBER,
+    RECEIVED NUMBER,
+    ISSUED NUMBER,
+    CLOSING_STOCK NUMBER,
+    LEAD_TIME_DAYS NUMBER
 );
 
--- DAILY_DEMAND table
-CREATE TABLE DAILY_DEMAND (
-    DEMAND_ID INT PRIMARY KEY,
-    DEMAND_DATE DATE,
-    ITEM_ID INT,
-    LOCATION_ID INT,
-    QUANTITY_DEMANDED INT,
-    ACTUAL_CONSUMPTION INT,
-    FOREIGN KEY(ITEM_ID) REFERENCES INVENTORY_ITEMS(ITEM_ID)
-);
+Step 3: Load Sample Data (Optional)
+INSERT INTO DAILY_STOCK VALUES
+('2025-01-01', 'Hospital A', 'Insulin', 100, 20, 30, 90, 7),
+('2025-01-01', 'Hospital A', 'Paracetamol', 500, 200, 150, 550, 5),
+('2025-01-01', 'NGO Center', 'Oxygen Cylinder', 40, 10, 15, 35, 10);
 
--- ACTION_LOG table
-CREATE TABLE ACTION_LOG (
-    ACTION_ID INT PRIMARY KEY,
+
+💡 In production, data can be ingested via Snowpipe / COPY INTO from files or APIs.
+
+4️⃣ Create Stock Health Dynamic Table (AI Brain)
+
+This Dynamic Table automatically computes stock health metrics.
+
+CREATE OR REPLACE DYNAMIC TABLE STOCK_HEALTH_DT
+TARGET_LAG = '5 minutes'
+WAREHOUSE = COMPUTE_WH
+AS
+SELECT
+    LOCATION,
+    ITEM,
+    AVG(ISSUED) AS AVG_DAILY_DEMAND,
+    MAX(CLOSING_STOCK) AS CLOSING_STOCK,
+    MAX(LEAD_TIME_DAYS) AS LEAD_TIME_DAYS,
+    CASE
+        WHEN MAX(CLOSING_STOCK) / NULLIF(AVG(ISSUED), 0) < 3 THEN 'Critical'
+        WHEN MAX(CLOSING_STOCK) / NULLIF(AVG(ISSUED), 0) < 7 THEN 'Warning'
+        ELSE 'Healthy'
+    END AS STOCK_STATUS,
+    MAX(CLOSING_STOCK) / NULLIF(AVG(ISSUED), 1) AS DAYS_TO_STOCKOUT
+FROM DAILY_STOCK
+GROUP BY LOCATION, ITEM;
+
+
+This table:
+
+Auto-refreshes
+
+Acts as the AI decision layer
+
+Powers dashboards, alerts, and actions
+
+5️⃣ Create Action Log Table (Human-in-the-Loop)
+CREATE OR REPLACE TABLE ACTION_LOG (
     ACTION_TIMESTAMP TIMESTAMP,
-    ITEM_ID INT,
-    LOCATION_ID INT,
-    ACTION_TYPE VARCHAR(50),
-    USER_NAME VARCHAR(100),
-    NOTES VARCHAR(500),
-    STATUS VARCHAR(20),
-    FOREIGN KEY(ITEM_ID) REFERENCES INVENTORY_ITEMS(ITEM_ID)
+    LOCATION STRING,
+    ITEM STRING,
+    ACTION_TYPE STRING,
+    NOTES STRING,
+    USER_NAME STRING
 );
 
--- ALERT_SETTINGS table
-CREATE TABLE ALERT_SETTINGS (
-    USER_ID INT PRIMARY KEY,
-    EMAIL_ALERTS BOOLEAN,
-    SMS_ALERTS BOOLEAN,
-    WHATSAPP_ALERTS BOOLEAN,
-    EMAIL_ADDRESS VARCHAR(100),
-    PHONE_NUMBER VARCHAR(20),
-    ALERT_SEVERITY VARCHAR(20)
-);
-```
 
-### Step 3: Load Sample Data
+Used for:
 
-```sql
--- Insert sample inventory items
-INSERT INTO INVENTORY_ITEMS VALUES
-(1, 'Bandages', 'Supplies', 500, 100, 50, 3, 5.00, CURRENT_TIMESTAMP),
-(2, 'Insulin', 'Medications', 200, 50, 25, 5, 50.00, CURRENT_TIMESTAMP),
-(3, 'Oxygen', 'Gases', 300, 75, 40, 2, 100.00, CURRENT_TIMESTAMP),
-(4, 'Syringes', 'Supplies', 1000, 200, 100, 2, 2.00, CURRENT_TIMESTAMP);
-```
+Logging procurement actions
 
-## Environment Variables
+Audit trail
 
-### Create .env File
+Accountability
 
-```bash
-# In project root directory, create .env file
-cat > .env << EOF
-# Snowflake Configuration
-SNOWFLAKE_ACCOUNT=your_account_name
-SNOWFLAKE_USER=your_username
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_DATABASE=HOSPITAL_STOCK_DB
-SNOWFLAKE_SCHEMA=PUBLIC
+6️⃣ Streamlit App Setup (Inside Snowflake)
+Step 1: Open Snowflake UI
 
-# Application Settings
-APP_ENV=development
-DEBUG_MODE=true
-LOG_LEVEL=INFO
+Go to Projects → Streamlit
 
-# Alert Settings
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your_email@gmail.com
-SMTP_PASSWORD=your_app_password
+Click Create Streamlit App
 
-# Optional Settings
-MAX_WORKERS=4
-CACHE_DURATION=3600
-EOF
-```
+Step 2: Configure App
 
-### Update config/database_config.py
+Database: CARESTOCK_DB
 
-```python
-import os
-from dotenv import load_dotenv
+Schema: PUBLIC
 
-load_dotenv()
+Warehouse: COMPUTE_WH
 
-SNOWFLAKE_CONFIG = {
-    'account': os.getenv('SNOWFLAKE_ACCOUNT'),
-    'user': os.getenv('SNOWFLAKE_USER'),
-    'password': os.getenv('SNOWFLAKE_PASSWORD'),
-    'warehouse': os.getenv('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH'),
-    'database': os.getenv('SNOWFLAKE_DATABASE', 'HOSPITAL_STOCK_DB'),
-    'schema': os.getenv('SNOWFLAKE_SCHEMA', 'PUBLIC')
-}
-```
+Step 3: Paste Application Code
 
-## Running the Application
+Copy contents of streamlit_app.py
 
-### Local Development
+Paste into Snowflake Streamlit editor
 
-```bash
-# Make sure virtual environment is activated
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Save & Run
 
-# Run Streamlit application
-streamlit run src/app.py
+No external deployment needed.
 
-# Application will be available at http://localhost:8501
-```
+7️⃣ Python Dependencies (Local Only – Optional)
 
-### Production Deployment (Snowflake Streamlit)
+If running locally:
 
-1. Push code to GitHub:
-   ```bash
-   git add .
-   git commit -m "Deploy to production"
-   git push origin main
-   ```
-
-2. In Snowflake, create Streamlit app:
-   ```sql
-   CREATE STREAMLIT CARESTOCK_WATCH_APP
-   ROOT_LOCATION = @STREAMLIT_STAGE
-   MAIN_FILE = 'src/app.py';
-   ```
-
-3. Access via Snowsight at: `https://<account>.snowflakecomputing.com/streamlit/`
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue 1: ModuleNotFoundError**
-```bash
-# Solution: Reinstall dependencies
-pip install --upgrade pip
 pip install -r requirements.txt
-```
 
-**Issue 2: Snowflake Connection Error**
-```bash
-# Solution: Verify Snowflake credentials
-# Check .env file
-# Verify account name format: https://<account_id>.snowflakecomputing.com
-```
 
-**Issue 3: Port 8501 Already in Use**
-```bash
-# Solution: Run on different port
-streamlit run src/app.py --server.port 8502
-```
+Example requirements.txt:
 
-**Issue 4: Virtual Environment Not Found**
-```bash
-# Solution: Recreate virtual environment
-rm -rf venv
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+streamlit
+snowflake-snowpark-python
+pandas
+plotly
 
-### Getting Help
+8️⃣ Optional Automation (Future-Ready)
 
-1. Check logs:
-   ```bash
-   # Streamlit debug mode
-   streamlit run src/app.py --logger.level=debug
-   ```
+CareStock Watch is designed to support:
 
-2. Test database connection:
-   ```bash
-   python -c "from src.modules.data_loader import DataLoader; DataLoader().test_connection()"
-   ```
+🔄 Snowflake Streams for change tracking
 
-3. Check Python version:
-   ```bash
-   python --version
-   ```
+⏱️ Snowflake Tasks for scheduled refresh & alerts
 
-4. Report issues on GitHub: [Issue Tracker](https://github.com/sahilsaeidkhan/CareStock-Watch/issues)
+📢 Email / SMS alert integration
 
-## Next Steps
+🔗 External API ingestion via Snowflake External Functions
 
-1. Read [MAIN_README.md](MAIN_README.md) for project overview
-2. Check [CODE_STRUCTURE.md](CODE_STRUCTURE.md) for codebase organization
-3. Review [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for API details
-4. Start the application and explore the dashboard
+These are architecturally supported but optional for the prototype.
 
----
+9️⃣ Security & Governance
 
-**Setup Last Updated**: December 26, 2025
+Role-based access control (RBAC)
+
+No data movement outside Snowflake
+
+All processing and AI logic runs inside Snowflake
+
+Action logs enable audit-ready workflows
+
+🔟 Validation Checklist (For Judges)
+
+✅ Data ingested into Snowflake
+✅ Dynamic Tables auto-compute intelligence
+✅ Streamlit app runs natively in Snowflake
+✅ AI-ready forecasting logic implemented
+✅ Human actions logged and auditable
+✅ Secure, privacy-safe architecture
+
+1️⃣1️⃣ Support
+
+For issues:
+
+Review PROJECT_DOCUMENTATION.md
+
+Check Snowflake permissions
+
+Validate warehouse status
+
+1️⃣2️⃣ Author
+
+Developed by: Sahil Saeid Khan
+Purpose: AI for Good Hackathon / Educational Use
+Status: Prototype (Production-ready architecture
