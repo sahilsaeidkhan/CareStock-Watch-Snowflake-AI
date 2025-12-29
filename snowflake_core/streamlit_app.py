@@ -57,9 +57,15 @@ footer {visibility: hidden;}
 # =================================================
 # SNOWFLAKE SESSION
 # =================================================
+from snowflake.snowpark.exceptions import SnowparkSessionException
+
 @st.cache_resource
 def get_session():
-    return get_active_session()
+    try:
+        return get_active_session()
+    except Exception:
+        # No active Snowpark session found (e.g., local dev without credentials)
+        return None
 
 session = get_session()
 
@@ -68,6 +74,39 @@ session = get_session()
 # =================================================
 @st.cache_data(ttl=300)
 def load_stock_health():
+    # If Snowflake session is not available, return a small sample dataframe
+    if session is None:
+        data = [
+            {
+                "LOCATION": "Hospital A",
+                "ITEM": "Insulin",
+                "CLOSING_STOCK": 90,
+                "AVG_DAILY_DEMAND": 30,
+                "DAYS_TO_STOCKOUT": 3,
+                "STOCK_STATUS": "Critical",
+                "LEAD_TIME_DAYS": 7
+            },
+            {
+                "LOCATION": "Hospital A",
+                "ITEM": "Paracetamol",
+                "CLOSING_STOCK": 550,
+                "AVG_DAILY_DEMAND": 150,
+                "DAYS_TO_STOCKOUT": 3.7,
+                "STOCK_STATUS": "Healthy",
+                "LEAD_TIME_DAYS": 5
+            },
+            {
+                "LOCATION": "NGO Center",
+                "ITEM": "Oxygen Cylinder",
+                "CLOSING_STOCK": 35,
+                "AVG_DAILY_DEMAND": 15,
+                "DAYS_TO_STOCKOUT": 2.3,
+                "STOCK_STATUS": "Warning",
+                "LEAD_TIME_DAYS": 10
+            }
+        ]
+        return pd.DataFrame(data)
+
     return session.sql("""
         SELECT
             LOCATION,
@@ -81,6 +120,9 @@ def load_stock_health():
     """).to_pandas()
 
 df = load_stock_health()
+
+if session is None:
+    st.info("Running in local mode: no Snowflake session found. Using sample data. Provide Snowflake credentials to enable live data.")
 
 # =================================================
 # SESSION STATE (Settings persistence)
