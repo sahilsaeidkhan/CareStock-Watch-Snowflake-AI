@@ -108,7 +108,7 @@ def get_session():
                 st.warning(f"Failed to create Snowflake Session from env vars: {e}")
 
         # No session available; app should run in local demo mode
-        st.warning("No Snowflake session found. Running in LOCAL demo mode (no Snowflake connection).")
+        # Removed warning about no Snowflake session found. Running in silent local demo mode.
         return None
 
 session = get_session()
@@ -276,30 +276,8 @@ if "alert_levels" not in st.session_state:
 if "recipients" not in st.session_state:
     st.session_state.recipients = ["Hospital procurement team"]
 
-# -----------------------
-# Location mapping editor
-# -----------------------
-if "location_map" not in st.session_state:
-    # start with an empty mapping; users can provide mappings via the editor if desired
-    st.session_state.location_map = {}
 
-with st.expander("🔁 Edit location name mappings (optional)"):
-    loc_json = json.dumps(st.session_state.location_map, ensure_ascii=False, indent=2)
-    user_input = st.text_area(
-        "Provide a JSON object mapping raw LOCATION codes to full names (leave as {} to keep raw LOCATION codes):",
-        value=loc_json,
-        height=160
-    )
-    if st.button("Apply location mapping"):
-        try:
-            parsed = json.loads(user_input)
-            if not isinstance(parsed, dict):
-                st.error("Mapping must be a JSON object (dictionary).")
-            else:
-                st.session_state.location_map = parsed
-                st.success("Location mapping updated")
-        except Exception as e:
-            st.error(f"Invalid JSON: {e}")
+## Location mapping editor removed as requested
 
 # =================================================
 # SIDEBAR
