@@ -239,7 +239,7 @@ def generate_targeted_demo(n=100, pct_at_risk=0.2, pct_life_saving=0.15):
 
     return df_local
 
-# Apply user-provided location mapping so UI shows readable names
+
 if "location_map" in st.session_state and st.session_state.location_map:
     try:
         df["LOCATION"] = df["LOCATION"].astype(str).apply(
@@ -277,7 +277,7 @@ if "recipients" not in st.session_state:
     st.session_state.recipients = ["Hospital procurement team"]
 
 
-## Location mapping editor removed as requested
+
 
 # =================================================
 # SIDEBAR
